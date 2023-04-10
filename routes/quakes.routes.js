@@ -4,8 +4,8 @@ const Quake = require('../models/quake.model');
 
 //Write routes here
 quakesRouter.route('/').get((req, res) => {
-  const socketIORouter = require('./socketIO.routes')(app.io);
-  console.log(socketIORouter.report)
+  // const socketIORouter = require('./socketIO.routes')(app.io);
+  // console.log(socketIORouter.report)
   Quake.find()
     .sort('-createdAt')
     .skip(parseInt(req.query.offset))
