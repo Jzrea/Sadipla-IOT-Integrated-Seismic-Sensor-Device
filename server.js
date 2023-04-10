@@ -28,6 +28,7 @@ app.io = require('socket.io')({
       'http://localhost:4000',
     ],
   },
+  rejectUnauthorized: false,
   transports: ['websocket'],
 });
 const socketIORouter = require('./routes/socketIO.routes')(app.io);
