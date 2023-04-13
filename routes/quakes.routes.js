@@ -15,4 +15,3 @@ quakesRouter.route('/').get((req, res) => {
 });
 
 module.exports = quakesRouter;
-    

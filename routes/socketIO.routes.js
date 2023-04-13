@@ -49,6 +49,8 @@ module.exports = function (io) {
       let updateStarted = true;
       //AUTHENTICATED LISTENERS
       socket.on('quakeUpdate', payload => {
+        sendNotif();
+
         ground.push(payload.ground);
         second.push(payload.second);
         third.push(payload.third);
