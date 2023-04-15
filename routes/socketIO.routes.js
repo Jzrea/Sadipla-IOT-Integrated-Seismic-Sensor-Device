@@ -1,7 +1,8 @@
 const express = require('express');
 const Quake = require('../models/quake.model');
 const socketAuth = require('../middleware/socketAuth');
-const sendNotif = require('../utils/fcm');
+const admin = require('../utils/fcm');
+// const tokens = require('../utils/tokens')
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ module.exports = function (io) {
   let roomClient = [];
   let iotClient;
 
+  let tokens = [];
   let ground = [];
   let second = [];
   let third = [];
@@ -23,22 +25,30 @@ module.exports = function (io) {
 
     io.to(socket.id).emit('auth');
     //SOCKET NETWORK AUTHENTICATIONS
-    const password = process.env.SOCKETIO_KEY;
+    const socketKey = process.env.SOCKETIO_KEY;
     // console.log(password);
-    socket.on('auth', creds => {
+    socket.on('auth', ({id, password, token}) => {
       console.log('client authenticated');
-      // console.log(creds);
-      if (password === creds.password) {
+      if (tokens.length > 20) {
+        tokens = [];
+        io.to('appClient').emit('auth');
+        return;
+      }
+      // console.log(;
+      if (socketKey === password) {
+        if (!tokens.includes(token) && (token != null || token != undefined)) {
+          tokens.push(token);
+        }
         if (roomClient.includes(`${socket.id}`)) {
           return;
         }
         socket.join('clients');
-        if (creds.id === 'appClient') {
+        if (id === 'appClient') {
           socket.join('appClient');
-        } else if (creds.id === 'iotClient') {
+        } else if (id === 'iotClient') {
           socket.join('iotClient');
           iotClient = socket.id;
-          io.to('appClient').emit('iotStatus', { isOnline: true });
+          io.to('appClient').emit('iotStatus', {isOnline: true});
         }
         roomClient.push(socket.id);
       } else {
@@ -48,21 +58,44 @@ module.exports = function (io) {
 
       let updateStarted = true;
       //AUTHENTICATED LISTENERS
-      socket.on('quakeUpdate', payload => {
-        sendNotif();
+      socket.on('quakeUpdate', async payload => {
+        // sendMessage();
 
         ground.push(payload.ground);
         second.push(payload.second);
         third.push(payload.third);
         // const date = new Date();
         // console.log(`compare: ${Date.now()<t0}`)
-        if (updateStarted) {
+        if (updateStarted && tokens.length > 0) {
           t0 = Date.now();
           updateStarted = false;
-          sendNotif();
+          const message = {
+            tokens, // ['token_1', 'token_2', ...]
+            data: {type: 'emergency'},
+          };
+          await admin.messaging().sendMulticast(message);
         }
         t1 = Date.now();
         // duration =  (t1 - t0 ) / 1000;
+      });
+      socket.on('quakeUpdateTest', async payload => {
+        if (updateStarted && tokens.length > 0) {
+          const message = {
+            tokens, // ['token_1', 'token_2', ...]
+            data: {type: 'emergency'},
+          };
+          console.log(tokens);
+          await admin.messaging().sendMulticast(message);
+        }
+        // duration =  (t1 - t0 ) / 1000;
+      });
+
+      socket.on('subscribe', ({token}) => {
+        // console.log('subscribed:', token);
+        if (!tokens.includes(token)) {
+          tokens.push(token);
+        }
+        console.log('subscribers:', tokens);
       });
 
       socket.on('quakeUpdateDone', () => {
@@ -121,7 +154,7 @@ module.exports = function (io) {
       if (socket.id === iotClient) {
         // console.log('iotRoom: ' + iotRoomClient.length);
         iotClient = undefined;
-        io.to('appClient').emit('iotStatus', { isOnline: false });
+        io.to('appClient').emit('iotStatus', {isOnline: false});
       }
       socket.removeAllListeners();
     });
